@@ -8,7 +8,55 @@ class SigenStorClient:
         self.client_1 = ModbusClient(host=ip, port=port, unit_id=1, auto_open=True, auto_close=True)
         self.client_247 = ModbusClient(host=ip, port=port, unit_id=247, auto_open=True, auto_close=True)
 
-    # Chapter 5.1 Modbus Doc (read only)
+
+
+    def _read_s32(self, client, register):
+        """
+        Liest einen 32-Bit Signed Integer aus zwei Modbus-Registern.
+        Der Rückgabewert ist bereits in kW umgerechnet.
+        """
+        result = client.read_holding_registers(register, 2)
+
+        if not result:
+            return None
+
+        value = (result[0] << 16) | result[1]
+
+        if value >= 0x80000000:
+            value -= 0x100000000
+
+        return value / 1000    
+
+
+    # Chapter 5.1 Modbus Doc (read only) - Oberste x funktiionen sind erweitert
+
+    def get_current_grid_power(self):
+        """
+        Aktuelle Netzleistung.
+
+        > 0 = Netzbezug
+        < 0 = Netzeinspeisung
+        """
+        return self._read_s32(self.client_247, 30005)
+
+    def get_current_pv_power(self):
+        return self._read_s32(self.client_247, 30035)
+
+    def get_current_battery_power(self):
+        """
+        Aktuelle Batterieleistung.
+
+        > 0 = Akku lädt
+        < 0 = Akku entlädt
+        """
+        return self._read_s32(self.client_247, 30037)
+
+    def get_current_load_power(self):
+        return (
+            self.get_current_pv_power()
+            + self.get_current_grid_power()
+            - self.get_current_battery_power()
+        )
 
     def get_selected_operating_mode(self):
         """
